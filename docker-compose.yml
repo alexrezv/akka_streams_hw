@@ -2,7 +2,7 @@ version: '2'
 
 services:
   postgres:
-    image: postgres:latest
+    image: postgres:9.6.24
     container_name: postgres
     environment:
       - "TZ=Europe/Amsterdam"
@@ -14,7 +14,7 @@ services:
       - "./sql:/docker-entrypoint-initdb.d"
 
   cassandra:
-    image: cassandra:3
+    image: cassandra:3.11.14
     container_name: cassandra
     ports:
       - "7000:7000"
