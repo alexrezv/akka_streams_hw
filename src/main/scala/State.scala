@@ -1,11 +1,11 @@
 import TypedCalculatorMain.CborSerialization
 
-final case class State(value: Int) extends CborSerialization {
-  def add(amount: Int): State = copy(value = value + amount)
+final case class State(value: Double) extends CborSerialization {
+  def add(amount: Double): State = copy(value = value + amount)
 
-  def multiply(amount: Int): State = copy(value = value * amount)
+  def multiply(amount: Double): State = copy(value = value * amount)
 
-  def divide(amount: Int): State = copy(value = value / amount)
+  def divide(amount: Double): State = copy(value = value / amount)
 
 }
 

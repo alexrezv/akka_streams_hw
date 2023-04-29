@@ -16,9 +16,9 @@ object TypedCalculatorMain {
     Behaviors.setup {
       ctx =>
         val writeActorRef = ctx.spawn(TypedCalculatorWriteSide(), "Calc", Props.empty)
-        writeActorRef ! Add(10)
-        writeActorRef ! Multiply(2)
-        writeActorRef ! Divide(5)
+        writeActorRef ! Add(15)
+        writeActorRef ! Divide(7)
+        writeActorRef ! Multiply(3)
 
         Behaviors.same
     }

@@ -4,7 +4,8 @@ import TypedCalculatorMain.persistenceId
 import akka.actor.typed.ActorSystem
 import akka.persistence.cassandra.query.scaladsl.CassandraReadJournal
 import akka.persistence.query.{EventEnvelope, PersistenceQuery}
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Broadcast, Flow, GraphDSL, RunnableGraph, Sink, Source}
+import akka.stream.{ClosedShape, FlowShape, SinkShape, SourceShape}
 import akka.{NotUsed, actor}
 
 case class TypedCalculatorReadSide(system: ActorSystem[NotUsed]) {
@@ -75,6 +76,7 @@ case class TypedCalculatorReadSide(system: ActorSystem[NotUsed]) {
 
       }*/
 
+  /*
   source
     .map { x =>
       println(x.toString())
@@ -97,5 +99,61 @@ case class TypedCalculatorReadSide(system: ActorSystem[NotUsed]) {
             println(s"Log from Divided: $latestCalculatedResult")
         }
     }
+*/
+
+  private def updateState(event: Any, seqNum: Long): Result = {
+    val newState: Double = event match {
+      case Added(_, amount) =>
+        println(s"Log from Added: $latestCalculatedResult")
+        latestCalculatedResult + amount
+      case Multiplied(_, amount) =>
+        println(s"Log from Multiplied: $latestCalculatedResult")
+        latestCalculatedResult * amount
+      case Divided(_, amount) =>
+        println(s"Log from Divided: $latestCalculatedResult")
+        latestCalculatedResult / amount
+
+    }
+    Result(newState, seqNum)
+  }
+
+  val graph = GraphDSL.create() {
+    implicit builder: GraphDSL.Builder[NotUsed] =>
+      import GraphDSL.Implicits._
+
+      //1.
+      val input: SourceShape[EventEnvelope] = builder.add(source)
+      val stateUpdater: FlowShape[EventEnvelope, Result] = builder.add(Flow[EventEnvelope].map(e => updateState(e.event, e.sequenceNr)))
+      val localSaveOutput: SinkShape[Result] = builder.add(Sink.foreach[Result] {
+        r =>
+          latestCalculatedResult = r.state
+          println("something to print")
+      })
+
+      val dbSaveOutput: SinkShape[Result] = builder.add(
+        // Slick.sink[Result](r => updatedResultAndOffset(r))
+        Sink.foreach[Result] {
+          r =>
+            updatedResultAndOffset(r.state, r.offset + 1)
+            println("something to print")
+        }
+      )
+
+      // надо разделить builder на 2 c помощью Broadcast
+      //см https://blog.rockthejvm.com/akka-streams-graphs/
+
+      val broadcast = builder.add(Broadcast[Result](outputPorts = 2))
+
+      input ~> stateUpdater ~> broadcast
+
+      //надо будет сохранить flow(разделенный на 2) в localSaveOutput и dbSaveOutput
+      broadcast.out(0) ~> localSaveOutput
+      broadcast.out(1) ~> dbSaveOutput
+
+      //в конце закрыть граф и запустить его RunnableGraph.fromGraph(graph).run()
+      ClosedShape
+  }
+
+  private val runTheGraph: NotUsed = RunnableGraph.fromGraph(graph).run()
 
 }
