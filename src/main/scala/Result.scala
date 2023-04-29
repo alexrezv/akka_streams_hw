@@ -1,1 +1,5 @@
-case class Result(state: Double, offset: Long)
+case class Result(
+                   id: Long,
+                   state: Double,
+                   offset: Long
+                 )

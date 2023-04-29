@@ -3,6 +3,7 @@ import akka.NotUsed
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorSystem, Behavior, Props}
 import akka.persistence.typed.PersistenceId
+import akka.stream.alpakka.slick.scaladsl.SlickSession
 
 import scala.concurrent.ExecutionContextExecutor
 
@@ -35,8 +36,12 @@ object TypedCalculatorMain {
     val value = TypedCalculatorMain()
     implicit val system: ActorSystem[NotUsed] = ActorSystem(value, "akka_typed")
 
+    implicit val session: SlickSession = SlickSession.forConfig("slick-postgres")
+
     TypedCalculatorReadSide(system)
     implicit val executionContext: ExecutionContextExecutor = system.executionContext
+
+    system.whenTerminated.onComplete(_ => session.close())
   }
 
 }

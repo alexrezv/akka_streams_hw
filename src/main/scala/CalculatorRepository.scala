@@ -1,58 +1,25 @@
-import scalikejdbc.DB.using
-import scalikejdbc.{ConnectionPool, ConnectionPoolSettings, DB}
+import akka.Done
+import akka.stream.alpakka.slick.scaladsl.{Slick, SlickSession}
+import akka.stream.scaladsl.Sink
+import slick.jdbc.GetResult
+
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future}
 
 object CalculatorRepository {
 
-  //homework how to do
-  //1.
-  /*
-  def createSession(): SlickSession = {
-    //создайте сессию согласно документации
-  }
-  */
+  implicit val getResult: GetResult[Result] = GetResult(r => Result(r.nextLong(), r.nextDouble(), r.nextLong()))
 
-
-  def initDatabase(): Unit = {
-    Class.forName("org.postgresql.Driver")
-    val poolSettings = ConnectionPoolSettings(initialSize = 10, maxSize = 100)
-    ConnectionPool.singleton("jdbc:postgresql://localhost:5432/demo", "docker", "docker", poolSettings)
+  def getLatestOffsetAndResult(implicit session: SlickSession): Result = {
+    import session.profile.api._
+    val query = sql"select * from public.result where id = 1;".as[Result].headOption
+    val f = session.db.run(query)
+    Await.result(f, atMost = 3.seconds).get
   }
 
-  // homework
-  // case class Result(state: Double, offset:Long)
-  /*
-  def getLatestsOffsetAndResult: Result = {
-    val query = sql"select * from public.result where id = 1;".as[Double].headOption
-    //надо создать future для db.run
-    //с помошью await получите результат или прокиньте ошибку если результат нет
-  }
-  */
-
-
-  def getLatestOffsetAndResult: (Int, Double) = {
-    val entities =
-      DB readOnly { session =>
-        session.list("select * from public.result where id = 1;") {
-          row =>
-            (
-              row.int("write_side_offset"),
-              row.double("calculated_value"))
-        }
-      }
-    entities.head
-  }
-
-
-  //homework how to do
-  def updatedResultAndOffset(calculated: Double, offset: Long): Unit = {
-    using(DB(ConnectionPool.borrow())) {
-      db =>
-        db.autoClose(true)
-        db.localTx {
-          _.update("update public.result set calculated_value = ?, write_side_offset = ? where id = 1"
-            , calculated, offset)
-        }
-    }
+  def saveToDbSink(implicit session: SlickSession): Sink[Result, Future[Done]] = {
+    import session.profile.api._
+    Slick.sink[Result]((it: Result) => sqlu"update public.result set calculated_value = ${it.state}, write_side_offset = ${it.offset} where id = ${it.id}")
   }
 
 }
